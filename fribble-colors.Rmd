@@ -1,0 +1,80 @@
+---
+title: "Comparing Fribble Colors"
+author: "Jessica E. Kosie"
+date: "2024-12-10"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse); library(farver)
+```
+
+## Read in data file
+```{r read data}
+
+df <- read_csv("fribble_hex_codes.csv")
+
+```
+## Loop through and generate a comparison, using delta_e to compare each color to all other colors
+
+```{r calculate delta_e}
+
+delta_values <- tibble(value_1 = character(), value_2 = character(), delta_e = integer())
+
+for (i in 1:nrow(df)){ 
+  hex_1 = decode_colour(df$Hex_Code[i])
+  next_row = i + 1
+  for (j in 1:nrow(df)) {
+    hex_2 = decode_colour(df$Hex_Code[j])
+    delta_calc = compare_colour(hex_1, hex_2, from_space = 'rgb', method = "cie2000")
+    temp <- tibble(value_1 = df$Hex_Code[i], value_2 = df$Hex_Code[j], delta_e = delta_calc[1,1])
+    delta_values <- rbind(delta_values, temp)
+  }
+}
+
+```
+## Get the top 4 most different colors for base color
+
+```{r top 4 different}
+
+diff_colors <- tibble(base_color = character(), app_color = character(), delta_e = integer(), diff_ranking = integer(), )
+
+unique_colors <- unique(delta_values$value_1)
+
+for (i in 1:length(unique_colors)){
+  col_df <- delta_values %>% 
+    filter(value_1 == unique_colors[i]) %>% 
+    arrange(-delta_e) %>% 
+    mutate(diff_ranking = 1:length(unique_colors)) %>% 
+    filter(diff_ranking <= 4)
+  
+  colnames(col_df) <- c("base_color", "app_color", "delta_e", "diff_ranking")
+  
+  diff_colors <- rbind(diff_colors, col_df)
+}
+
+```
+## For each base color, what is the average delta e of the most different colors?
+
+```{r average difference}
+
+diff_colors %>% 
+  group_by(base_color) %>% 
+  summarise(avg_diff = mean(delta_e, na.rm = TRUE),
+            sd_diff = sd(delta_e, na.rm = TRUE))
+
+```
+## How frequently does each appendage color occur?
+
+Note: #E6BEFF is *never* one of the top 4 most different colors
+
+```{r appendage color frequency}
+
+diff_colors %>% 
+  group_by(app_color) %>% 
+  summarise(n = n()) %>% 
+  arrange(-n)
+  
+
+```
